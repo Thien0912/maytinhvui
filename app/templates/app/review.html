@@ -1,0 +1,126 @@
+{% extends 'app/base.html' %}
+{% load static %}
+{% block review %}
+<section class="pt-5 pb-5">
+    <div class="container">
+        <a class="btn btn-outline-dark" href="{% url 'detail' %}?id={{ product.id }}">&#x2190; Xem sản phẩm</a>
+        <h2 class="mb-2 text-center">Đánh giá sản phẩm</h2>
+        <p class="mb-5 text-center">Đánh giá của bạn giúp chúng tôi cải thiện sản phẩm.</p>
+ 
+        <div class="card-columns">
+            {% for review in reviews %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <blockquote class="blockquote">
+                        <p class="about" style="white-space: pre-wrap;">{{ review.comment }}</p>
+                        <footer class="blockquote-footer small p-1">
+                            <span class="small">{{ review.user.last_name }} {{ review.user.first_name }} - ⭐ {{ review.rating }}/5</span>
+                        </footer>
+                        <h6 class="small">{{ review.created_at|date:"d/m/Y H:i" }}</h6>
+                        {% if request.user == review.user %}
+                        <div class="d-flex justify-content-start">
+                            <button class="btn btn-warning btn-sm me-2" onclick="editReview({{ review.id }}, '{{ review.comment }}', {{ review.rating }})">
+                                <i class="bi bi-pencil"></i> Sửa
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteReview({{ review.id }})">
+                                <i class="bi bi-trash"></i> Xóa
+                            </button>
+                        </div>
+                        {% endif %}
+                    </blockquote>
+                </div>
+            </div>
+            {% empty %}
+            <p>Chưa có đánh giá nào.</p>
+            {% endfor %}
+        </div>
+
+        {% if user.is_authenticated %}
+        
+        <!-- Form bình luận chỉ hiển thị nếu người dùng chưa bình luận -->
+        <form id="reviewForm" style="display: {{ form_display }};">
+            <h3>Viết bình luận</h3>
+            {% csrf_token %}
+            <div class="d-flex mb-3">
+                <div class="me-3" style="max-width: 80px;">
+                    <label for="rating" class="form-label">Đánh giá:</label>
+                    <input type="number" id="rating" min="1" max="5" class="form-control" placeholder="1-5" required>
+                </div>
+                
+                <div class="flex-grow-1">
+                    <label for="comment" class="form-label">Bình luận:</label>
+                    <textarea id="comment" class="form-control" placeholder="Nhập bình luận..." rows="4" required></textarea>
+                </div>
+            </div>
+            <button type="submit" id="submitBtn" class="btn btn-primary w-100">Gửi</button>
+        </form>
+        
+        {% else %}
+        <p><a href="{% url 'login' %}">Đăng nhập</a> để bình luận.</p>
+        {% endif %}
+    </div>
+</section>
+
+<script>
+// Tương tự như trước, nhưng có thêm xử lý dựa trên review_id có sẵn
+document.getElementById("reviewForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+
+    let productId = "{{ product.id }}";
+    let rating = document.getElementById("rating").value;
+    let comment = document.getElementById("comment").value;
+    let csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+    let reviewId = document.getElementById("reviewForm").dataset.reviewId || "";
+
+    fetch(`/review/${productId}/add/`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRFToken": csrfToken
+        },
+        body: `rating=${rating}&comment=${comment}&review_id=${reviewId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === "updated" || data.status === "created") {
+            location.reload();  // Reload trang để cập nhật lại các bình luận
+        } else {
+            alert("Có lỗi xảy ra! Vui lòng thử lại.");
+        }
+    });
+});
+
+// Function to show the review form with existing data for editing
+function editReview(reviewId, comment, rating) {
+    document.getElementById("rating").value = rating;
+    document.getElementById("comment").value = comment;
+    document.getElementById("reviewForm").dataset.reviewId = reviewId;
+    document.getElementById("submitBtn").textContent = "Sửa bình luận";  // Đổi thành "Sửa bình luận"
+    document.getElementById("reviewForm").style.display = "block";  // Show the review form for editing
+}
+
+// Function to delete review
+function deleteReview(reviewId) {
+    let productId = "{{ product.id }}";
+    let csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+    fetch(`/review/${productId}/delete/`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRFToken": csrfToken
+        },
+        body: `review_id=${reviewId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === "deleted") {
+            location.reload();  // Reload trang để cập nhật lại danh sách bình luận
+        } else {
+            alert("Có lỗi xảy ra! Vui lòng thử lại.");
+        }
+    });
+}
+</script>
+
+{% endblock review %}
